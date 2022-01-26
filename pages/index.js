@@ -1,35 +1,7 @@
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { Box, Button, Image, Text, TextField } from "@skynexui/components";
 import appConfig from "../config.json";
-
-function GlobalStyle() {
-	return (
-		<style global jsx>{`
-			* {
-				margin: 0;
-				padding: 0;
-				box-sizing: border-box;
-				list-style: none;
-			}
-			body {
-				font-family: "Open Sans", sans-serif;
-			}
-			/* App fit Height */
-			html,
-			body,
-			#__next {
-				min-height: 100vh;
-				display: flex;
-				flex: 1;
-			}
-			#__next {
-				flex: 1;
-			}
-			#__next > * {
-				flex: 1;
-			}
-		`}</style>
-	);
-}
 
 function Titulo(props) {
 	const Tag = props.tag || "h1";
@@ -65,19 +37,34 @@ function Titulo(props) {
 // }
 
 export default function PaginaInicial() {
-	const username = "luigicpereira";
+	const [userInputValue, setUserInputValue] = useState("");
+	const [username, setUsername] = useState("");
+	const [name, setName] = useState("");
+	const roteamento = useRouter();
+
+	useEffect(() => {
+		if (!username) return;
+
+		fetch(`https://api.github.com/users/${username}`).then((response) => {
+			if (response.status === 200) {
+				response.json().then((data) => {
+					setName(data.name);
+				});
+			}
+		});
+	}, [username]);
 
 	return (
 		<>
-			<GlobalStyle />
 			<Box
 				styleSheet={{
 					display: "flex",
 					alignItems: "center",
 					justifyContent: "center",
-					backgroundColor: appConfig.theme.colors.primary[500],
+					backgroundColor: appConfig.theme.colors.primary["050"],
 					backgroundImage:
-						"url(https://virtualbackgrounds.site/wp-content/uploads/2020/08/the-matrix-digital-rain.jpg)",
+						// "url(https://virtualbackgrounds.site/wp-content/uploads/2020/08/the-matrix-digital-rain.jpg)",
+						"url(https://www.gov.br/pt-br/noticias/financas-impostos-e-gestao-publica/2019/12/numero-de-investidores-ativos-no-tesouro-direto-cresce-56-em-um-ano/money-2696219_1920.jpg)",
 					backgroundRepeat: "no-repeat",
 					backgroundSize: "cover",
 					backgroundBlendMode: "multiply",
@@ -104,6 +91,10 @@ export default function PaginaInicial() {
 					{/* Formulário */}
 					<Box
 						as="form"
+						onSubmit={(event) => {
+							event.preventDefault();
+							roteamento.push(`/chat`);
+						}}
 						styleSheet={{
 							display: "flex",
 							flexDirection: "column",
@@ -114,7 +105,9 @@ export default function PaginaInicial() {
 							marginBottom: "32px",
 						}}
 					>
-						<Titulo tag="h2">Boas vindas de volta!</Titulo>
+						<Titulo tag="h2">
+							Boas vindas de volta{name ? `, ${name}` : ""}!
+						</Titulo>
 						<Text
 							variant="body3"
 							styleSheet={{
@@ -134,6 +127,16 @@ export default function PaginaInicial() {
 									mainColorHighlight: appConfig.theme.colors.primary[500],
 									backgroundColor: appConfig.theme.colors.neutrals[800],
 								},
+							}}
+							value={userInputValue}
+							onChange={(event) => {
+								setUserInputValue(event.target.value);
+
+								if (event.target.value.length > 2) {
+									setUsername(event.target.value);
+								} else {
+									setUsername("");
+								}
 							}}
 						/>
 						<Button
@@ -171,7 +174,7 @@ export default function PaginaInicial() {
 								borderRadius: "50%",
 								marginBottom: "16px",
 							}}
-							src={`https://github.com/${username}.png`}
+							src={username ? `https://github.com/${username}.png` : ""}
 						/>
 						<Text
 							variant="body4"
