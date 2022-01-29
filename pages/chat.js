@@ -2,19 +2,37 @@ import { Box, Text, TextField, Image, Button } from "@skynexui/components";
 import React, { useEffect, useState } from "react";
 import appConfig from "../config.json";
 import { createClient } from "@supabase/supabase-js";
-import Loading from "../components/Loading/Loading";
+import Loading from "../src/components/Loading";
+import { useRouter } from "next/router";
+import { ButtonSendSticker } from "../src/components/ButtonSendSticker";
 
 const SUPABASE_ANON_KEY =
 	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzQyNDg0NywiZXhwIjoxOTU5MDAwODQ3fQ.XHpQ3oJd31dHSy4cKd1eapdZRIKk1MuUHJssfv18Af4";
 const SUPABASE_URL = "https://liblhajcjkevmxilsdqi.supabase.co";
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+function escutaMensagemEmTempoReal(adicionaMensagem) {
+	return supabaseClient
+		.from("mensagens")
+		.on("INSERT", ({ new: novaMensagem }) => {
+			adicionaMensagem(novaMensagem);
+		})
+		.subscribe();
+}
+
 export default function ChatPage() {
 	const [mensagem, setMensagem] = useState("");
 	const [listaDeMensagens, setListaDeMensagens] = useState([]);
 	const [loading, setLoading] = useState(true);
 
+	const roteamento = useRouter();
+	const usuarioLogado = roteamento.query.username;
+
 	useEffect(() => {
+		if (!usuarioLogado) {
+			roteamento.push("/");
+			return;
+		}
 		setLoading(true);
 		const dtInicio = new Date();
 		supabaseClient
@@ -23,10 +41,11 @@ export default function ChatPage() {
 			.order("created_at", { ascending: false })
 			.then((response) => {
 				const dtParcial = new Date();
+				const TOTAL_TIME_TO_LOAD = 5000;
 				return new Promise((resolve) =>
 					setTimeout(
 						() => resolve(response),
-						5000 - Math.min(dtParcial - dtInicio, 5000)
+						TOTAL_TIME_TO_LOAD - Math.min(dtParcial - dtInicio, 5000)
 					)
 				);
 			})
@@ -34,31 +53,30 @@ export default function ChatPage() {
 				setListaDeMensagens(response.data);
 				setLoading(false);
 			});
+
+		escutaMensagemEmTempoReal((mensagem) => {
+			setListaDeMensagens((oldState) => [mensagem, ...oldState]);
+			setMensagem("");
+		});
 	}, []);
 
 	function handleNovaMensagem(novaMensagem) {
 		const mensagem = {
-			de: "luigicpereira",
+			de: usuarioLogado,
 			texto: novaMensagem,
 		};
 
-		supabaseClient
-			.from("mensagens")
-			.insert([mensagem])
-			.then((response) => {
-				setListaDeMensagens((oldState) => [response.data[0], ...oldState]);
-			});
-
-		setMensagem("");
+		supabaseClient.from("mensagens").insert([mensagem]).then();
 	}
 
 	function handleDeletaMensagem(id) {
+		supabaseClient.from("mensagens").delete(id);
 		setListaDeMensagens((oldState) =>
 			oldState.filter((mensagem) => mensagem.id !== id)
 		);
 	}
 
-	// return <Loading />;
+	if (!usuarioLogado) return <></>;
 
 	return (
 		<Box
@@ -102,16 +120,7 @@ export default function ChatPage() {
 					}}
 				>
 					{loading ? (
-						<Box
-							styleSheet={{
-								flex: 1,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Loading />
-						</Box>
+						<LoadingContainer />
 					) : (
 						<MessageList
 							mensagens={listaDeMensagens}
@@ -150,6 +159,11 @@ export default function ChatPage() {
 								color: appConfig.theme.colors.neutrals[200],
 							}}
 						/>
+						<ButtonSendSticker
+							onStickerClick={(stickerUrl) => {
+								handleNovaMensagem(`:sticker:${stickerUrl}`);
+							}}
+						/>
 						<Button
 							variant="primary"
 							label="Enviar"
@@ -163,6 +177,21 @@ export default function ChatPage() {
 					</Box>
 				</Box>
 			</Box>
+		</Box>
+	);
+}
+
+function LoadingContainer() {
+	return (
+		<Box
+			styleSheet={{
+				flex: 1,
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+			}}
+		>
+			<Loading />
 		</Box>
 	);
 }
@@ -260,7 +289,14 @@ function MessageList(props) {
 							}}
 						/>
 					</Box>
-					{mensagem.texto}
+					{mensagem.texto.startsWith(":sticker:") ? (
+						<Image
+							src={mensagem.texto.replace(":sticker:", "")}
+							styleSheet={{ maxHeight: "20vh" }}
+						/>
+					) : (
+						mensagem.texto
+					)}
 				</Text>
 			))}
 		</Box>
