@@ -1,20 +1,54 @@
 import { Box, Text, TextField, Image, Button } from "@skynexui/components";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import appConfig from "../config.json";
+import { createClient } from "@supabase/supabase-js";
+import Loading from "../components/Loading/Loading";
+
+const SUPABASE_ANON_KEY =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzQyNDg0NywiZXhwIjoxOTU5MDAwODQ3fQ.XHpQ3oJd31dHSy4cKd1eapdZRIKk1MuUHJssfv18Af4";
+const SUPABASE_URL = "https://liblhajcjkevmxilsdqi.supabase.co";
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export default function ChatPage() {
 	const [mensagem, setMensagem] = useState("");
 	const [listaDeMensagens, setListaDeMensagens] = useState([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		setLoading(true);
+		const dtInicio = new Date();
+		supabaseClient
+			.from("mensagens")
+			.select("*")
+			.order("created_at", { ascending: false })
+			.then((response) => {
+				const dtParcial = new Date();
+				return new Promise((resolve) =>
+					setTimeout(
+						() => resolve(response),
+						5000 - Math.min(dtParcial - dtInicio, 5000)
+					)
+				);
+			})
+			.then((response) => {
+				setListaDeMensagens(response.data);
+				setLoading(false);
+			});
+	}, []);
 
 	function handleNovaMensagem(novaMensagem) {
-		setListaDeMensagens((oldState) => [
-			{
-				id: oldState.length + 1,
-				de: "um usuário qualquer",
-				texto: novaMensagem,
-			},
-			...oldState,
-		]);
+		const mensagem = {
+			de: "luigicpereira",
+			texto: novaMensagem,
+		};
+
+		supabaseClient
+			.from("mensagens")
+			.insert([mensagem])
+			.then((response) => {
+				setListaDeMensagens((oldState) => [response.data[0], ...oldState]);
+			});
+
 		setMensagem("");
 	}
 
@@ -23,6 +57,8 @@ export default function ChatPage() {
 			oldState.filter((mensagem) => mensagem.id !== id)
 		);
 	}
+
+	// return <Loading />;
 
 	return (
 		<Box
@@ -65,10 +101,23 @@ export default function ChatPage() {
 						padding: "16px",
 					}}
 				>
-					<MessageList
-						mensagens={listaDeMensagens}
-						deleteFunction={handleDeletaMensagem}
-					/>
+					{loading ? (
+						<Box
+							styleSheet={{
+								flex: 1,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Loading />
+						</Box>
+					) : (
+						<MessageList
+							mensagens={listaDeMensagens}
+							deleteFunction={handleDeletaMensagem}
+						/>
+					)}
 
 					<Box
 						as="form"
@@ -185,7 +234,7 @@ function MessageList(props) {
 									display: "inline-block",
 									marginRight: "8px",
 								}}
-								src={`https://github.com/vanessametonini.png`}
+								src={`https://github.com/${mensagem.de}.png`}
 							/>
 							<Text tag="strong">{mensagem.de}</Text>
 							<Text
